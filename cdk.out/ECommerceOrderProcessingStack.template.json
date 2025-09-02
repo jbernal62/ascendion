@@ -1,0 +1,1623 @@
+{
+ "Resources": {
+  "OrdersTable315BB997": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "orderId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "timestamp",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "customerId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "CustomerIdIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "customerId",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "StatusIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "orderId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "timestamp",
+      "KeyType": "RANGE"
+     }
+    ],
+    "SSESpecification": {
+     "SSEEnabled": true
+    },
+    "TableName": "ecommerce-orders"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrdersTable/Resource"
+   }
+  },
+  "OrderProcessingDLQ2C6E2FE6": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "KmsMasterKeyId": "alias/aws/sqs",
+    "QueueName": "order-processing-dlq"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderProcessingDLQ/Resource"
+   }
+  },
+  "OrderProcessingQueueAB52CA49": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "KmsMasterKeyId": "alias/aws/sqs",
+    "QueueName": "order-processing-queue",
+    "RedrivePolicy": {
+     "deadLetterTargetArn": {
+      "Fn::GetAtt": [
+       "OrderProcessingDLQ2C6E2FE6",
+       "Arn"
+      ]
+     },
+     "maxReceiveCount": 3
+    },
+    "VisibilityTimeout": 300
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderProcessingQueue/Resource"
+   }
+  },
+  "LambdaExecutionRoleD5C26073": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/LambdaExecutionRole/Resource"
+   }
+  },
+  "LambdaExecutionRoleDefaultPolicy6D69732F": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "OrdersTable315BB997",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "OrdersTable315BB997",
+             "Arn"
+            ]
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "sqs:ChangeMessageVisibility",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl",
+        "sqs:ReceiveMessage",
+        "sqs:SendMessage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "OrderProcessingQueueAB52CA49",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": "sns:Publish",
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "SMSNotificationsTopic2CA7FE20"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "LambdaExecutionRoleDefaultPolicy6D69732F",
+    "Roles": [
+     {
+      "Ref": "LambdaExecutionRoleD5C26073"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/LambdaExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrderIngestionLogGroup43C2F7A7": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 7
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderIngestionLogGroup/Resource"
+   }
+  },
+  "OrderIngestionFunction9A74693D": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "966dd99e8645168a9bf89ab77a6936a7148acb4ea263e75abe81b054e3e66905.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "ORDERS_TABLE_NAME": {
+       "Ref": "OrdersTable315BB997"
+      },
+      "ORDER_QUEUE_URL": {
+       "Ref": "OrderProcessingQueueAB52CA49"
+      },
+      "SNS_TOPIC_ARN": {
+       "Ref": "SMSNotificationsTopic2CA7FE20"
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "LoggingConfig": {
+     "LogGroup": {
+      "Ref": "OrderIngestionLogGroup43C2F7A7"
+     }
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "LambdaExecutionRoleD5C26073",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "LambdaExecutionRoleDefaultPolicy6D69732F",
+    "LambdaExecutionRoleD5C26073"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderIngestionFunction/Resource",
+    "aws:asset:path": "asset.966dd99e8645168a9bf89ab77a6936a7148acb4ea263e75abe81b054e3e66905",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "OrderProcessingLogGroup0AD10187": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 7
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderProcessingLogGroup/Resource"
+   }
+  },
+  "OrderProcessingFunctionE5F5791A": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "83d7b8ce3c2255be7f2be932557ce9930439d945975b0e6d0f981aec366d8645.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "ORDERS_TABLE_NAME": {
+       "Ref": "OrdersTable315BB997"
+      },
+      "SNS_TOPIC_ARN": {
+       "Ref": "SMSNotificationsTopic2CA7FE20"
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "LoggingConfig": {
+     "LogGroup": {
+      "Ref": "OrderProcessingLogGroup0AD10187"
+     }
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "LambdaExecutionRoleD5C26073",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "LambdaExecutionRoleDefaultPolicy6D69732F",
+    "LambdaExecutionRoleD5C26073"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderProcessingFunction/Resource",
+    "aws:asset:path": "asset.83d7b8ce3c2255be7f2be932557ce9930439d945975b0e6d0f981aec366d8645",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "OrderProcessingFunctionSqsEventSourceECommerceOrderProcessingStackOrderProcessingQueue78921E3AD04D8374": {
+   "Type": "AWS::Lambda::EventSourceMapping",
+   "Properties": {
+    "BatchSize": 10,
+    "EventSourceArn": {
+     "Fn::GetAtt": [
+      "OrderProcessingQueueAB52CA49",
+      "Arn"
+     ]
+    },
+    "FunctionName": {
+     "Ref": "OrderProcessingFunctionE5F5791A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/OrderProcessingFunction/SqsEventSource:ECommerceOrderProcessingStackOrderProcessingQueue78921E3A/Resource"
+   }
+  },
+  "ChatbotLogGroupCA8B968C": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 7
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ChatbotLogGroup/Resource"
+   }
+  },
+  "ChatbotFunction1D8F8DA6": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "9dda7c25fd05c70a4d10e7b46b24d5ac701313d1a61faa3ca1f436acf7eb1f8f.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "ORDERS_TABLE_NAME": {
+       "Ref": "OrdersTable315BB997"
+      },
+      "BEDROCK_MODEL_ID": "anthropic.claude-v2"
+     }
+    },
+    "Handler": "index.handler",
+    "LoggingConfig": {
+     "LogGroup": {
+      "Ref": "ChatbotLogGroupCA8B968C"
+     }
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "LambdaExecutionRoleD5C26073",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.9",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "LambdaExecutionRoleDefaultPolicy6D69732F",
+    "LambdaExecutionRoleD5C26073"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ChatbotFunction/Resource",
+    "aws:asset:path": "asset.9dda7c25fd05c70a4d10e7b46b24d5ac701313d1a61faa3ca1f436acf7eb1f8f",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "ECommerceOrderAPI5952FE42": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "API for eCommerce order processing system",
+    "Name": "ecommerce-order-api"
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Resource"
+   }
+  },
+  "ECommerceOrderAPICloudWatchRole1ABE7120": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/CloudWatchRole/Resource"
+   }
+  },
+  "ECommerceOrderAPIAccountE2535C9F": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "ECommerceOrderAPICloudWatchRole1ABE7120",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "ECommerceOrderAPI5952FE42"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Account"
+   }
+  },
+  "ECommerceOrderAPIDeploymentA20AF15850fc7e263486b0ee4a0bea7e1f124b1a": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "API for eCommerce order processing system",
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "DependsOn": [
+    "ECommerceOrderAPIchatbotOPTIONS2F1B421A",
+    "ECommerceOrderAPIchatbotPOST2D9DD499",
+    "ECommerceOrderAPIchatbot9E6170AD",
+    "ECommerceOrderAPIOPTIONS670FB9E5",
+    "ECommerceOrderAPIordersorderIdGETEDF70C0F",
+    "ECommerceOrderAPIordersorderIdOPTIONS3756E4EE",
+    "ECommerceOrderAPIordersorderId41693804",
+    "ECommerceOrderAPIordersOPTIONS8F3F21AB",
+    "ECommerceOrderAPIordersPOST57AE1E56",
+    "ECommerceOrderAPIordersFB535191"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "ECommerceOrderAPIDeploymentStageprodAF2CBB8F": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "ECommerceOrderAPIDeploymentA20AF15850fc7e263486b0ee4a0bea7e1f124b1a"
+    },
+    "MethodSettings": [
+     {
+      "DataTraceEnabled": true,
+      "HttpMethod": "*",
+      "LoggingLevel": "INFO",
+      "MetricsEnabled": true,
+      "ResourcePath": "/*",
+      "ThrottlingBurstLimit": 2000,
+      "ThrottlingRateLimit": 1000
+     }
+    ],
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    },
+    "StageName": "prod"
+   },
+   "DependsOn": [
+    "ECommerceOrderAPIAccountE2535C9F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/DeploymentStage.prod/Resource"
+   }
+  },
+  "ECommerceOrderAPIOPTIONS670FB9E5": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "ECommerceOrderAPI5952FE42",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/OPTIONS/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersFB535191": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "ECommerceOrderAPI5952FE42",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "orders",
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersOPTIONS8F3F21AB": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIordersFB535191"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/OPTIONS/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersPOSTApiPermissionECommerceOrderProcessingStackECommerceOrderAPI7DD7866EPOSTorders9DE2167F": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrderIngestionFunction9A74693D",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/",
+       {
+        "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+       },
+       "/POST/orders"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/POST/ApiPermission.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.POST..orders"
+   }
+  },
+  "ECommerceOrderAPIordersPOSTApiPermissionTestECommerceOrderProcessingStackECommerceOrderAPI7DD7866EPOSTorders5C546296": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrderIngestionFunction9A74693D",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/test-invoke-stage/POST/orders"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/POST/ApiPermission.Test.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.POST..orders"
+   }
+  },
+  "ECommerceOrderAPIordersPOST57AE1E56": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": true,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "OrderIngestionFunction9A74693D",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIordersFB535191"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/POST/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersorderId41693804": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "ECommerceOrderAPIordersFB535191"
+    },
+    "PathPart": "{orderId}",
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/{orderId}/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersorderIdOPTIONS3756E4EE": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIordersorderId41693804"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/{orderId}/OPTIONS/Resource"
+   }
+  },
+  "ECommerceOrderAPIordersorderIdGETApiPermissionECommerceOrderProcessingStackECommerceOrderAPI7DD7866EGETordersorderId154ACDF9": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrderIngestionFunction9A74693D",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/",
+       {
+        "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+       },
+       "/GET/orders/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/{orderId}/GET/ApiPermission.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.GET..orders.{orderId}"
+   }
+  },
+  "ECommerceOrderAPIordersorderIdGETApiPermissionTestECommerceOrderProcessingStackECommerceOrderAPI7DD7866EGETordersorderIdF8D11558": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrderIngestionFunction9A74693D",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/test-invoke-stage/GET/orders/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/{orderId}/GET/ApiPermission.Test.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.GET..orders.{orderId}"
+   }
+  },
+  "ECommerceOrderAPIordersorderIdGETEDF70C0F": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": true,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "GET",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "OrderIngestionFunction9A74693D",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIordersorderId41693804"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/orders/{orderId}/GET/Resource"
+   }
+  },
+  "ECommerceOrderAPIchatbot9E6170AD": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "ECommerceOrderAPI5952FE42",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "chatbot",
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/chatbot/Resource"
+   }
+  },
+  "ECommerceOrderAPIchatbotOPTIONS2F1B421A": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIchatbot9E6170AD"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/chatbot/OPTIONS/Resource"
+   }
+  },
+  "ECommerceOrderAPIchatbotPOSTApiPermissionECommerceOrderProcessingStackECommerceOrderAPI7DD7866EPOSTchatbotD38B656E": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ChatbotFunction1D8F8DA6",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/",
+       {
+        "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+       },
+       "/POST/chatbot"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/chatbot/POST/ApiPermission.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.POST..chatbot"
+   }
+  },
+  "ECommerceOrderAPIchatbotPOSTApiPermissionTestECommerceOrderProcessingStackECommerceOrderAPI7DD7866EPOSTchatbot55C38A72": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ChatbotFunction1D8F8DA6",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "ECommerceOrderAPI5952FE42"
+       },
+       "/test-invoke-stage/POST/chatbot"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/chatbot/POST/ApiPermission.Test.ECommerceOrderProcessingStackECommerceOrderAPI7DD7866E.POST..chatbot"
+   }
+  },
+  "ECommerceOrderAPIchatbotPOST2D9DD499": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": true,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ChatbotFunction1D8F8DA6",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "ECommerceOrderAPIchatbot9E6170AD"
+    },
+    "RestApiId": {
+     "Ref": "ECommerceOrderAPI5952FE42"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/Default/chatbot/POST/Resource"
+   }
+  },
+  "ECommerceOrderAPIECommerceAPIKey0291F290": {
+   "Type": "AWS::ApiGateway::ApiKey",
+   "Properties": {
+    "Enabled": true,
+    "StageKeys": [
+     {
+      "RestApiId": {
+       "Ref": "ECommerceOrderAPI5952FE42"
+      },
+      "StageName": {
+       "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/ECommerceAPIKey/Resource"
+   }
+  },
+  "ECommerceOrderAPIECommerceUsagePlanCD7D5073": {
+   "Type": "AWS::ApiGateway::UsagePlan",
+   "Properties": {
+    "ApiStages": [
+     {
+      "ApiId": {
+       "Ref": "ECommerceOrderAPI5952FE42"
+      },
+      "Stage": {
+       "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+      },
+      "Throttle": {}
+     }
+    ],
+    "Quota": {
+     "Limit": 10000,
+     "Period": "DAY"
+    },
+    "Throttle": {
+     "BurstLimit": 200,
+     "RateLimit": 100
+    },
+    "UsagePlanName": "ecommerce-usage-plan"
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/ECommerceUsagePlan/Resource"
+   }
+  },
+  "ECommerceOrderAPIECommerceUsagePlanUsagePlanKeyResourceECommerceOrderProcessingStackECommerceOrderAPIECommerceAPIKey6F15EA45C8AAC3AE": {
+   "Type": "AWS::ApiGateway::UsagePlanKey",
+   "Properties": {
+    "KeyId": {
+     "Ref": "ECommerceOrderAPIECommerceAPIKey0291F290"
+    },
+    "KeyType": "API_KEY",
+    "UsagePlanId": {
+     "Ref": "ECommerceOrderAPIECommerceUsagePlanCD7D5073"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/ECommerceOrderAPI/ECommerceUsagePlan/UsagePlanKeyResource:ECommerceOrderProcessingStackECommerceOrderAPIECommerceAPIKey6F15EA45"
+   }
+  },
+  "SMSNotificationsTopic2CA7FE20": {
+   "Type": "AWS::SNS::Topic",
+   "Properties": {
+    "DisplayName": "eCommerce Order SMS Notifications",
+    "TopicName": "ecommerce-order-notifications"
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/SMSNotificationsTopic/Resource"
+   }
+  },
+  "SMSSubscription532DB659": {
+   "Type": "AWS::SNS::Subscription",
+   "Properties": {
+    "Endpoint": "+31629408162",
+    "Protocol": "sms",
+    "TopicArn": {
+     "Ref": "SMSNotificationsTopic2CA7FE20"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/SMSSubscription/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21Ry1LDMAz8lt5dQ5svaHkdoENoy7mjOCKIJraJbTqZTP4d2Ukph5600lrSar2Uy0Umb2dwcnNVHuc1FbLfeVBHwaVDX3YaGlNycQ9FjeLuQycwCPftZP8WMKRiAoMgaGS/NePDFHNTk+piOqJB1KbizhdTPbUm2MicMXPQFCXI/jFo5cnoyP7hhx/UfmdCq3AD1pKuIn29mmPbkHPcxkqzAziH3slVDJzLdVBH9GtwKMBSBR5P0LFydH5lKYm/wJVSJmgv7tHWpmt4Xaz+y9ivKl08Am5NctL4DfpPU0ZyQmd2WjJi3vSMyaUJvTuelNeQHLie8DO+TbOXe2NJpa9JYBcKp1qyZwP/58NwEZDciJInz16Dt8EPIu9YqL7J5GIps9mXI5q3fD81KLdj/AVvj0SnNgIAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "ECommerceOrderProcessingStack/CDKMetadata/Default"
+   },
+   "Condition": "CDKMetadataAvailable"
+  }
+ },
+ "Outputs": {
+  "ECommerceOrderAPIEndpoint3D7A364D": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "ECommerceOrderAPI5952FE42"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "APIEndpoint": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "ECommerceOrderAPI5952FE42"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "ECommerceOrderAPIDeploymentStageprodAF2CBB8F"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "OrdersTableName": {
+   "Value": {
+    "Ref": "OrdersTable315BB997"
+   }
+  },
+  "OrderQueueURL": {
+   "Value": {
+    "Ref": "OrderProcessingQueueAB52CA49"
+   }
+  },
+  "SNSTopicARN": {
+   "Value": {
+    "Ref": "SMSNotificationsTopic2CA7FE20"
+   }
+  }
+ },
+ "Conditions": {
+  "CDKMetadataAvailable": {
+   "Fn::Or": [
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "af-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-3"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-4"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-northwest-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-2"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "il-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "sa-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-west-1"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "AWS::Region"
+      },
+      "us-west-2"
+     ]
+    }
+   ]
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

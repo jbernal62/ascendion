@@ -1,0 +1,62 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "966dd99e8645168a9bf89ab77a6936a7148acb4ea263e75abe81b054e3e66905": {
+      "displayName": "OrderIngestionFunction/Code",
+      "source": {
+        "path": "asset.966dd99e8645168a9bf89ab77a6936a7148acb4ea263e75abe81b054e3e66905",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region-e18acc6d": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "966dd99e8645168a9bf89ab77a6936a7148acb4ea263e75abe81b054e3e66905.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "83d7b8ce3c2255be7f2be932557ce9930439d945975b0e6d0f981aec366d8645": {
+      "displayName": "OrderProcessingFunction/Code",
+      "source": {
+        "path": "asset.83d7b8ce3c2255be7f2be932557ce9930439d945975b0e6d0f981aec366d8645",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region-282f8e8b": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "83d7b8ce3c2255be7f2be932557ce9930439d945975b0e6d0f981aec366d8645.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "9dda7c25fd05c70a4d10e7b46b24d5ac701313d1a61faa3ca1f436acf7eb1f8f": {
+      "displayName": "ChatbotFunction/Code",
+      "source": {
+        "path": "asset.9dda7c25fd05c70a4d10e7b46b24d5ac701313d1a61faa3ca1f436acf7eb1f8f",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region-af9f5009": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "9dda7c25fd05c70a4d10e7b46b24d5ac701313d1a61faa3ca1f436acf7eb1f8f.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "3fb96205cf7eb142d70bef60793752e970cc110fa9321f6e887325907c5264dd": {
+      "displayName": "ECommerceOrderProcessingStack Template",
+      "source": {
+        "path": "ECommerceOrderProcessingStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-03fd6e44": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "3fb96205cf7eb142d70bef60793752e970cc110fa9321f6e887325907c5264dd.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
