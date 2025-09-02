@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash:*)",
+      "Bash(aws cloudformation describe-stacks:*)",
+      "Bash(aws apigateway get-api-keys:*)",
+      "Bash(aws apigateway get-api-key:*)",
+      "Bash(source:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(aws logs describe-log-groups:*)",
+      "Bash(aws lambda list-functions:*)",
+      "Bash(cdk deploy:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Read(C:\\Users\\Ezra\\Documents/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
